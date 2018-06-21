@@ -763,6 +763,12 @@ contract("ColonyNetworkStaking", accounts => {
       assert(parseInt(addr, 16) !== 0);
       await checkErrorRevert(colonyNetwork.startNextCycle());
     });
+
+    it('should not allow "rewardStakersWithReputation" to be called by someone not the colonyNetwork', async () => {
+      const addr = await colonyNetwork.getReputationMiningCycle.call(true);
+      const repCycle = ReputationMiningCycle.at(addr);
+      await checkErrorRevert(repCycle.rewardStakersWithReputation([MAIN_ACCOUNT], 0x0, 10000, 3));
+    });
   });
 
   describe("Types of disagreement", () => {
@@ -1259,6 +1265,30 @@ contract("ColonyNetworkStaking", accounts => {
       await repCycle.confirmNewHash(1);
     });
 
+    it("should fail to respondToBinarySearchForChallenge if not consistent with JRH", async () => {
+      await giveUserCLNYTokensAndStake(colonyNetwork, MAIN_ACCOUNT, "1000000000000000000");
+      await giveUserCLNYTokensAndStake(colonyNetwork, OTHER_ACCOUNT, "1000000000000000000");
+
+      const addr = await colonyNetwork.getReputationMiningCycle.call(true);
+      await forwardTime(3600, this);
+      const repCycle = ReputationMiningCycle.at(addr);
+
+      await goodClient.addLogContentsToReputationTree();
+      await badClient.addLogContentsToReputationTree();
+
+      await goodClient.submitRootHash();
+      await badClient.submitRootHash();
+
+      await goodClient.submitJustificationRootHash();
+      await badClient.submitJustificationRootHash();
+
+      await checkErrorRevert(repCycle.respondToBinarySearchForChallenge(0, 0, 0x0, 0x0, []), "colony-invalid-binary-search-response");
+
+      // Cleanup
+      await accommodateChallengeAndInvalidateHash(this, goodClient, badClient);
+      await repCycle.confirmNewHash(1);
+    });
+
     it("should fail to respondToChallenge if any part of the key is wrong", async () => {
       await giveUserCLNYTokensAndStake(colonyNetwork, MAIN_ACCOUNT, "1000000000000000000");
       await giveUserCLNYTokensAndStake(colonyNetwork, OTHER_ACCOUNT, "1000000000000000000");
@@ -1556,7 +1586,7 @@ contract("ColonyNetworkStaking", accounts => {
       await giveUserCLNYTokensAndStake(colonyNetwork, OTHER_ACCOUNT, "1000000000000000000");
       badClient = new MaliciousReputationMinerExtraRep(
         { loader: contractLoader, minerAddress: OTHER_ACCOUNT, realProviderPort: REAL_PROVIDER_PORT },
-        11,
+        31,
         0xffffffffffff
       );
       await badClient.initialise(colonyNetwork.address);
@@ -1581,6 +1611,7 @@ contract("ColonyNetworkStaking", accounts => {
 
       addr = await colonyNetwork.getReputationMiningCycle.call(true);
       repCycle = ReputationMiningCycle.at(addr);
+
       await goodClient.addLogContentsToReputationTree();
       await badClient.addLogContentsToReputationTree();
 
@@ -1599,7 +1630,7 @@ contract("ColonyNetworkStaking", accounts => {
       await giveUserCLNYTokensAndStake(colonyNetwork, OTHER_ACCOUNT, "1000000000000000000");
       badClient = new MaliciousReputationMinerExtraRep(
         { loader: contractLoader, minerAddress: OTHER_ACCOUNT, realProviderPort: REAL_PROVIDER_PORT },
-        11,
+        31,
         0xffffffffffff
       );
       await badClient.initialise(colonyNetwork.address);
@@ -1644,7 +1675,7 @@ contract("ColonyNetworkStaking", accounts => {
       await giveUserCLNYTokensAndStake(colonyNetwork, OTHER_ACCOUNT, "1000000000000000000");
       badClient = new MaliciousReputationMinerExtraRep(
         { loader: contractLoader, minerAddress: OTHER_ACCOUNT, realProviderPort: REAL_PROVIDER_PORT },
-        12,
+        27,
         new BN("-1000000000000000000000000000000000000000000")
       );
       await badClient.initialise(colonyNetwork.address);
@@ -1675,6 +1706,7 @@ contract("ColonyNetworkStaking", accounts => {
 
       addr = await colonyNetwork.getReputationMiningCycle.call(true);
       repCycle = ReputationMiningCycle.at(addr);
+
       await goodClient.addLogContentsToReputationTree();
       await badClient.addLogContentsToReputationTree();
 
